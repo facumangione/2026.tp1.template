@@ -1,0 +1,212 @@
+# Teoría del Proyecto BiblioTech
+
+---
+
+## 1. Arquitectura en capas
+
+El proyecto se divide en cuatro capas con responsabilidades bien definidas:
+
+| Capa | Qué hace | Ejemplo |
+|---|---|---|
+| `model` | Representa los datos del sistema | `Libro`, `Socio` |
+| `repository` | Guarda y busca datos | `LibroRepositoryImpl` |
+| `service` | Aplica las reglas de negocio | `PrestamoService` |
+| `Main` | Interactúa con el usuario | Menú por consola |
+
+Separar en capas permite que si algo cambia (por ejemplo, pasar de memoria a base de datos), solo se toca la capa correspondiente sin romper el resto.
+
+---
+
+## 2. Principios SOLID
+
+### S — Single Responsibility
+Una clase tiene un solo motivo para cambiar. `Libro` representa datos, `LibroRepository` los guarda, `LibroService` aplica reglas. Ninguno hace el trabajo del otro.
+
+### O — Open/Closed
+El código está abierto para extensión, cerrado para modificación. Si aparece un nuevo tipo de recurso (Revista), se crea una clase nueva que implemente `Recurso`, sin tocar `Libro` ni `Ebook`.
+
+### L — Liskov Substitution
+Donde el código espera un `Socio`, debe funcionar igual con `SocioEstudiante` o `SocioDocente`. Ninguna subclase rompe el comportamiento esperado de la base.
+
+### I — Interface Segregation
+Las interfaces son pequeñas y específicas. `Repository<T, ID>` solo tiene `guardar`, `buscarPorId` y `buscarTodos`. No hay métodos que algunas implementaciones no necesiten.
+
+### D — Dependency Inversion
+Los servicios dependen de interfaces, no de implementaciones concretas. `PrestamoService` recibe un `Repository<Libro, String>`, no un `LibroRepositoryImpl`. Esto permite cambiar la implementación sin tocar el servicio.
+
+---
+
+## 3. Interfaces vs Clases Abstractas
+
+**Interfaz:** define un contrato (qué métodos debe tener), sin implementación. Se usa cuando tipos muy distintos comparten capacidades mínimas.
+
+```java
+public interface Recurso {
+    String isbn();   // Libro y Ebook deben tenerlo, pero son muy distintos
+    String titulo();
+}
+```
+
+**Clase abstracta:** puede tener implementación parcial. Se usa cuando varias clases comparten estructura y comportamiento, pero difieren en algunos detalles.
+
+```java
+public abstract class Socio {
+    // Comportamiento común a todos los socios
+    public boolean puedeTomarPrestado() {
+        return !bloqueado && librosPrestados.size() < getLimitePrestamos();
+    }
+
+    // Cada subclase define su propio límite
+    public abstract int getLimitePrestamos();
+}
+```
+
+En BiblioTech: `Recurso` es interfaz porque Libro y Ebook son muy distintos. `Socio` es clase abstracta porque Estudiante y Docente comparten nombre, DNI, email y toda la lógica de préstamos.
+
+---
+
+## 4. Records
+
+Un `record` es una clase inmutable diseñada para representar datos puros. Java genera automáticamente el constructor, getters, `equals`, `hashCode` y `toString`.
+
+```java
+// Equivalente a una clase con 30+ líneas
+public record Libro(String isbn, String titulo, String autor, int anio) {}
+
+// Uso
+Libro libro = new Libro("978-...", "Clean Code", "Martin", 2008);
+System.out.println(libro.titulo()); // getter sin "get"
+```
+
+Usá `record` cuando el objeto no cambia después de crearse (un Libro no muta). Usá clase cuando el objeto tiene estado variable (un Socio acumula préstamos).
+
+---
+
+## 5. Optional
+
+`Optional<T>` evita devolver `null` en búsquedas. Obliga a manejar el caso donde no hay resultado.
+
+```java
+// Sin Optional: peligroso
+Libro libro = repo.buscarPorIsbn("123"); // puede ser null
+libro.getTitulo(); // NullPointerException si no existe
+
+// Con Optional: seguro
+Optional<Libro> resultado = repo.buscarPorIsbn("123");
+Libro libro = resultado.orElseThrow(() -> new LibroNoEncontradoException("123"));
+```
+
+Métodos más usados:
+
+| Método | Qué hace |
+|---|---|
+| `Optional.ofNullable(v)` | Crea un Optional que acepta null |
+| `Optional.empty()` | Crea un Optional vacío |
+| `isPresent()` | true si tiene valor |
+| `orElse(x)` | Devuelve el valor o `x` si vacío |
+| `orElseThrow(ex)` | Devuelve el valor o lanza la excepción |
+| `ifPresent(accion)` | Ejecuta solo si tiene valor |
+
+---
+
+## 6. Excepciones Personalizadas
+
+Permiten manejar cada tipo de error de forma específica y hacen el código más legible.
+
+```java
+// MAL: genérico, no se sabe qué falló
+throw new Exception("Error");
+
+// BIEN: el tipo ya dice qué pasó
+throw new LibroNoDisponibleException(isbn);
+```
+
+La jerarquía del proyecto:
+```
+Exception
+└── BibliotecaException           ← base de todos los errores de negocio
+    ├── LibroNoDisponibleException
+    ├── LibroNoEncontradoException
+    ├── SocioNoEncontradoException
+    └── LimitePrestamosException
+```
+
+Tener una base común permite un catch genérico si es necesario, además de los catches específicos.
+
+---
+
+## 7. Repositorios e Inyección de Dependencias
+
+**Repositorio:** capa que abstrae el almacenamiento. El servicio no sabe si los datos están en memoria o en una base de datos.
+
+```java
+public interface Repository<T, ID> {
+    void guardar(T entidad);
+    Optional<T> buscarPorId(ID id);
+    List<T> buscarTodos();
+}
+```
+
+**Inyección de dependencias:** el servicio recibe sus repositorios por constructor, no los crea él mismo.
+
+```java
+// MAL: acoplado a la implementación concreta
+public class PrestamoService {
+    private LibroRepositoryImpl repo = new LibroRepositoryImpl();
+}
+
+// BIEN: depende de la interfaz, recibe lo que le pasen
+public class PrestamoService {
+    private final Repository<Libro, String> libroRepo;
+
+    public PrestamoService(Repository<Libro, String> libroRepo) {
+        this.libroRepo = libroRepo;
+    }
+}
+```
+
+Esto permite cambiar la implementación sin tocar el servicio.
+
+---
+
+## 8. Flujo de GitHub
+
+Cada funcionalidad sigue este ciclo:
+
+```
+1. Abrir Issue  →  descripción de la tarea
+2. Crear rama   →  git checkout -b feature/nombre
+3. Escribir código y commitear
+4. Push         →  git push origin feature/nombre
+5. Abrir PR     →  "Closes #N" vincula al Issue
+6. Revisar diff →  pestaña "Files changed"
+7. Mergear      →  el Issue se cierra automáticamente
+8. Volver a main→  git checkout main && git pull
+```
+
+---
+
+## 9. Conventional Commits
+
+Formato estándar para mensajes de commit:
+
+```
+tipo: descripción breve en minúsculas
+```
+
+| Tipo | Cuándo |
+|---|---|
+| `feat` | Nueva funcionalidad |
+| `fix` | Corrección de bug |
+| `refactor` | Cambio sin agregar ni corregir |
+| `docs` | Solo documentación |
+| `chore` | Configuración, dependencias |
+
+Ejemplos del proyecto:
+```
+feat: add Recurso interface
+feat: add Libro record
+fix: correct loan limit validation
+docs: update CHANGELOG with sprint 2
+chore: add .gitignore
+```
