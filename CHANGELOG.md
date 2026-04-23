@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [Sprint 4] - 2026-04-21
+### Added
+- Interfaz genérica `Repository<T, ID>`
+- `LibroRepositoryImpl` con almacenamiento en HashMap
+- `SocioRepositoryImpl` con almacenamiento en HashMap
+
 ## [Sprint 3] - 2026-04-21
 ### Added
 - `BibliotecaException` como clase base de todos los errores de negocio
