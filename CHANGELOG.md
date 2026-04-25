@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [Sprint 5.1] - 2026-04-25
+### Added
+- `DniDuplicadoException` excepción personalizada para DNI duplicado
+- `EbookRepositoryImpl` con almacenamiento en HashMap
+- `EbookService` con lógica de gestión de ebooks
+### Changed
+- `SocioService` usa `DniDuplicadoException` en lugar de `RuntimeException`
+- `Main.java` incluye menú completo de Ebooks
+
 ## [Sprint 5 ] - 2026-04-25
 ### Added
 - `LibroService` con lógica de gestión de libros
