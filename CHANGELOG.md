@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [Sprint 5 ] - 2026-04-25
+### Added
+- `LibroService` con lógica de gestión de libros
+- `SocioService` con validación de DNI único y formato de email
+- `PrestamoService` con lógica de préstamo, devolución e historial
+- `Main.java` con menú interactivo por consola
+
 ## [Sprint 4] - 2026-04-21
 ### Added
 - Interfaz genérica `Repository<T, ID>`
