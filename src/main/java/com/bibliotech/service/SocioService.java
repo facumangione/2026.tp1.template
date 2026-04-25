@@ -1,5 +1,6 @@
 package com.bibliotech.service;
 
+import com.bibliotech.exception.DniDuplicadoException;
 import com.bibliotech.exception.SocioNoEncontradoException;
 import com.bibliotech.model.Socio;
 import com.bibliotech.model.SocioDocente;
@@ -17,7 +18,7 @@ public class SocioService {
         this.socioRepo = socioRepo;
     }
 
-    public void registrarEstudiante(String nombre, String dni, String email) {
+    public void registrarEstudiante(String nombre, String dni, String email) throws DniDuplicadoException {
         validarDniUnico(dni);
         validarEmailFormato(email);
         Socio socio = new SocioEstudiante(contadorId++, nombre, dni, email);
@@ -25,7 +26,7 @@ public class SocioService {
         System.out.println("Estudiante registrado correctamente: " + nombre);
     }
 
-    public void registrarDocente(String nombre, String dni, String email) {
+    public void registrarDocente(String nombre, String dni, String email) throws DniDuplicadoException {
         validarDniUnico(dni);
         validarEmailFormato(email);
         Socio socio = new SocioDocente(contadorId++, nombre, dni, email);
@@ -42,10 +43,10 @@ public class SocioService {
         return socioRepo.buscarTodos();
     }
 
-    private void validarDniUnico(String dni) {
-        socioRepo.buscarPorDni(dni).ifPresent(s -> {
-            throw new RuntimeException("Ya existe un socio con el DNI: " + dni);
-        });
+    private void validarDniUnico(String dni) throws DniDuplicadoException {
+        if (socioRepo.buscarPorDni(dni).isPresent()) {
+            throw new DniDuplicadoException(dni);
+        }
     }
 
     private void validarEmailFormato(String email) {
