@@ -1,8 +1,10 @@
 package com.bibliotech;
 
 import com.bibliotech.exception.BibliotecaException;
+import com.bibliotech.repository.EbookRepositoryImpl;
 import com.bibliotech.repository.LibroRepositoryImpl;
 import com.bibliotech.repository.SocioRepositoryImpl;
+import com.bibliotech.service.EbookService;
 import com.bibliotech.service.LibroService;
 import com.bibliotech.service.PrestamoService;
 import com.bibliotech.service.SocioService;
@@ -13,14 +15,17 @@ public class Main {
 
     private static final Scanner scanner = new Scanner(System.in);
     private static LibroService libroService;
+    private static EbookService ebookService;
     private static SocioService socioService;
     private static PrestamoService prestamoService;
 
     public static void main(String[] args) {
         LibroRepositoryImpl libroRepo = new LibroRepositoryImpl();
+        EbookRepositoryImpl ebookRepo = new EbookRepositoryImpl();
         SocioRepositoryImpl socioRepo = new SocioRepositoryImpl();
 
         libroService = new LibroService(libroRepo);
+        ebookService = new EbookService(ebookRepo);
         socioService = new SocioService(socioRepo);
         prestamoService = new PrestamoService(libroRepo, socioRepo);
 
@@ -32,9 +37,10 @@ public class Main {
             int opcion = leerEntero("Ingresá una opción: ");
             switch (opcion) {
                 case 1 -> menuLibros();
-                case 2 -> menuSocios();
-                case 3 -> menuPrestamos();
-                case 4 -> prestamoService.mostrarHistorial();
+                case 2 -> menuEbooks();
+                case 3 -> menuSocios();
+                case 4 -> menuPrestamos();
+                case 5 -> prestamoService.mostrarHistorial();
                 case 0 -> {
                     System.out.println("Hasta luego.");
                     ejecutando = false;
@@ -47,9 +53,10 @@ public class Main {
     private static void mostrarMenu() {
         System.out.println("\n=== Menú Principal ===");
         System.out.println("1. Gestión de Libros");
-        System.out.println("2. Gestión de Socios");
-        System.out.println("3. Gestión de Préstamos");
-        System.out.println("4. Ver historial");
+        System.out.println("2. Gestión de Ebooks");
+        System.out.println("3. Gestión de Socios");
+        System.out.println("4. Gestión de Préstamos");
+        System.out.println("5. Ver historial");
         System.out.println("0. Salir");
     }
 
@@ -78,27 +85,57 @@ public class Main {
         }
     }
 
+    private static void menuEbooks() {
+        System.out.println("\n=== Gestión de Ebooks ===");
+        System.out.println("1. Registrar ebook");
+        System.out.println("2. Buscar por título");
+        System.out.println("3. Buscar por autor");
+        System.out.println("4. Buscar por categoría");
+        System.out.println("5. Listar todos");
+        int opcion = leerEntero("Ingresá una opción: ");
+        switch (opcion) {
+            case 1 -> {
+                String isbn = leerTexto("ISBN: ");
+                String titulo = leerTexto("Título: ");
+                String autor = leerTexto("Autor: ");
+                int anio = leerEntero("Año: ");
+                String categoria = leerTexto("Categoría: ");
+                String formato = leerTexto("Formato (PDF/EPUB): ");
+                ebookService.registrarEbook(isbn, titulo, autor, anio, categoria, formato);
+            }
+            case 2 -> ebookService.buscarPorTitulo(leerTexto("Título: ")).forEach(System.out::println);
+            case 3 -> ebookService.buscarPorAutor(leerTexto("Autor: ")).forEach(System.out::println);
+            case 4 -> ebookService.buscarPorCategoria(leerTexto("Categoría: ")).forEach(System.out::println);
+            case 5 -> ebookService.listarTodos().forEach(System.out::println);
+            default -> System.out.println("Opción no válida.");
+        }
+    }
+
     private static void menuSocios() {
         System.out.println("\n=== Gestión de Socios ===");
         System.out.println("1. Registrar estudiante");
         System.out.println("2. Registrar docente");
         System.out.println("3. Listar todos");
         int opcion = leerEntero("Ingresá una opción: ");
-        switch (opcion) {
-            case 1 -> {
-                String nombre = leerTexto("Nombre: ");
-                String dni = leerTexto("DNI: ");
-                String email = leerTexto("Email: ");
-                socioService.registrarEstudiante(nombre, dni, email);
+        try {
+            switch (opcion) {
+                case 1 -> {
+                    String nombre = leerTexto("Nombre: ");
+                    String dni = leerTexto("DNI: ");
+                    String email = leerTexto("Email: ");
+                    socioService.registrarEstudiante(nombre, dni, email);
+                }
+                case 2 -> {
+                    String nombre = leerTexto("Nombre: ");
+                    String dni = leerTexto("DNI: ");
+                    String email = leerTexto("Email: ");
+                    socioService.registrarDocente(nombre, dni, email);
+                }
+                case 3 -> socioService.listarTodos().forEach(System.out::println);
+                default -> System.out.println("Opción no válida.");
             }
-            case 2 -> {
-                String nombre = leerTexto("Nombre: ");
-                String dni = leerTexto("DNI: ");
-                String email = leerTexto("Email: ");
-                socioService.registrarDocente(nombre, dni, email);
-            }
-            case 3 -> socioService.listarTodos().forEach(System.out::println);
-            default -> System.out.println("Opción no válida.");
+        } catch (BibliotecaException e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
 
