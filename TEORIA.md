@@ -1,267 +1,179 @@
-# Teoría del Proyecto BiblioTech
+# Teoría - Programación en Java
 
 ---
 
-## Índice
+## 1. Orientación a Objetos
 
-1. Arquitectura en capas
-2. Principios SOLID
-3. Interfaces vs Clases Abstractas
-4. Herencia en profundidad
-5. Records
-6. Optional
-7. Excepciones Personalizadas
-8. Repositorios e Inyección de Dependencias
-9. Comandos de Git
-10. Flujo de GitHub
-11. Conventional Commits
+### Pilares de la OO
 
----
-
-## 1. Arquitectura en capas
-
-El proyecto se divide en cuatro capas con responsabilidades bien definidas:
-
-| Capa | Qué hace | Ejemplo |
-|---|---|---|
-| `model` | Representa los datos del sistema | `Libro`, `Socio` |
-| `repository` | Guarda y busca datos | `LibroRepositoryImpl` |
-| `service` | Aplica las reglas de negocio | `PrestamoService` |
-| `Main` | Interactúa con el usuario | Menú por consola |
-
-Separar en capas permite que si algo cambia (por ejemplo, pasar de memoria a base de datos), solo se toca la capa correspondiente sin romper el resto.
-
----
-
-## 2. Principios SOLID
-
-### S — Single Responsibility
-Una clase tiene un solo motivo para cambiar. `Libro` representa datos, `LibroRepository` los guarda, `LibroService` aplica reglas. Ninguno hace el trabajo del otro.
-
-### O — Open/Closed
-El código está abierto para extensión, cerrado para modificación. Si aparece un nuevo tipo de recurso (Revista), se crea una clase nueva que implemente `Recurso`, sin tocar `Libro` ni `Ebook`.
-
-### L — Liskov Substitution
-Donde el código espera un `Socio`, debe funcionar igual con `SocioEstudiante` o `SocioDocente`. Ninguna subclase rompe el comportamiento esperado de la base.
-
-### I — Interface Segregation
-Las interfaces son pequeñas y específicas. `Repository<T, ID>` solo tiene `guardar`, `buscarPorId` y `buscarTodos`. No hay métodos que algunas implementaciones no necesiten.
-
-### D — Dependency Inversion
-Los servicios dependen de interfaces, no de implementaciones concretas. `PrestamoService` recibe un `Repository<Libro, String>`, no un `LibroRepositoryImpl`. Esto permite cambiar la implementación sin tocar el servicio.
-
----
-
-## 3. Interfaces vs Clases Abstractas
-
-**Interfaz:** define un contrato (qué métodos debe tener), sin implementación. Se usa cuando tipos muy distintos comparten capacidades mínimas.
+#### Abstracción
+Consiste en modelar del mundo real solo lo que es relevante para el sistema. No representamos un libro con todos sus detalles físicos, sino solo lo que el sistema necesita: ISBN, título, autor, año.
 
 ```java
-public interface Recurso {
-    String isbn();   // Libro y Ebook deben tenerlo, pero son muy distintos
-    String titulo();
-}
+public record Libro(String isbn, String titulo, String autor, int anio) {}
+// Ignoramos el color de la tapa, el peso, etc.
 ```
 
-**Clase abstracta:** puede tener implementación parcial. Se usa cuando varias clases comparten estructura y comportamiento, pero difieren en algunos detalles.
+#### Encapsulamiento
+Ocultar el estado interno de un objeto y exponer solo lo necesario. Los campos son `private` y se accede a ellos mediante métodos públicos.
 
 ```java
 public abstract class Socio {
-    // Comportamiento común a todos los socios
-    public boolean puedeTomarPrestado() {
-        return !bloqueado && librosPrestados.size() < getLimitePrestamos();
-    }
+    private boolean bloqueado;            // nadie lo toca directamente
+    private List<String> librosPrestados; // idem
 
-    // Cada subclase define su propio límite
-    public abstract int getLimitePrestamos();
+    public boolean isBloqueado() { return bloqueado; }          // lectura controlada
+    public void setBloqueado(boolean b) { this.bloqueado = b; } // escritura controlada
 }
 ```
 
-| | Interfaz | Clase Abstracta |
-|---|---|---|
-| ¿Tiene implementación? | No | Puede tener ambas |
-| ¿Herencia múltiple? | Sí | No |
-| ¿Cuándo usarla? | Tipos distintos con capacidades comunes | Tipos similares con comportamiento compartido |
+Esto evita que el estado del objeto quede inconsistente por modificaciones externas.
 
-En BiblioTech: `Recurso` es interfaz porque Libro y Ebook son muy distintos. `Socio` es clase abstracta porque Estudiante y Docente comparten nombre, DNI, email y toda la lógica de préstamos.
-
----
-
-## 4. Herencia en profundidad
-
-La herencia permite que una clase (hija) tome todo lo que tiene otra clase (padre) y le agregue o modifique comportamiento. Es una de las bases de la programación orientada a objetos.
-
-### Cómo funciona
+#### Herencia
+Una clase hija hereda el estado y comportamiento de la clase padre, y puede agregar o modificar lo que necesite.
 
 ```java
 public abstract class Socio {
-    private final String nombre;  // campo heredado por todos
-
-    public Socio(String nombre) {
-        this.nombre = nombre;
-    }
-
-    public String getNombre() { return nombre; } // método heredado
-
-    public abstract int getLimitePrestamos(); // obliga a cada hijo a implementarlo
+    private final String nombre;
+    public abstract int getLimitePrestamos(); // cada hijo lo define
 }
 
 public class SocioEstudiante extends Socio {
-
-    public SocioEstudiante(String nombre) {
-        super(nombre); // llama al constructor del padre
-    }
-
     @Override
-    public int getLimitePrestamos() {
-        return 3; // implementación específica del hijo
-    }
+    public int getLimitePrestamos() { return 3; }
 }
 ```
 
-### La palabra clave `super`
-
-`super` se usa para referirse a la clase padre. Tiene dos usos principales:
-
+La palabra `super` permite acceder al constructor o métodos del padre:
 ```java
-// 1. Llamar al constructor del padre (siempre primera línea)
 public SocioEstudiante(int id, String nombre, String dni, String email) {
     super(id, nombre, dni, email, CategoriaSocio.ESTUDIANTE);
 }
-
-// 2. Llamar a un método del padre desde el hijo
-@Override
-public String toString() {
-    return super.toString() + " - Estudiante"; // usa el toString del padre y agrega
-}
 ```
 
-### La anotación `@Override`
-
-Le dice al compilador que estás sobreescribiendo un método del padre. Si te equivocás en el nombre del método, el compilador te avisa. Es buena práctica usarla siempre.
-
-```java
-@Override
-public int getLimitePrestamos() { // si escribís "getLimitePrestamo" (sin s), el compilador falla
-    return 3;
-}
-```
-
-### Polimorfismo
-
-Es la capacidad de tratar objetos de distintos tipos de forma uniforme a través de la clase base. Es el resultado más poderoso de la herencia.
+#### Polimorfismo
+La capacidad de tratar objetos de distintos tipos de forma uniforme. Java decide en tiempo de ejecución qué método ejecutar según el tipo real del objeto.
 
 ```java
-// Este método no sabe si recibe un Estudiante o un Docente
 public void mostrarLimite(Socio socio) {
-    // getLimitePrestamos() ejecuta el método correcto según el tipo real
-    System.out.println(socio.getNombre() + ": " + socio.getLimitePrestamos());
+    System.out.println(socio.getLimitePrestamos()); // 3 o 5 según el tipo real
 }
 
 mostrarLimite(new SocioEstudiante(...)); // imprime 3
 mostrarLimite(new SocioDocente(...));    // imprime 5
 ```
 
-Java decide en tiempo de ejecución cuál versión del método llamar según el tipo real del objeto. Esto se llama **dynamic dispatch**.
-
-### Cuándo usar herencia y cuándo no
-
-Usá herencia cuando la relación es "es un":
-- `SocioEstudiante` **es un** `Socio` ✅
-- `Libro` **es un** `Recurso` ✅
-
-No uses herencia cuando la relación es "tiene un":
-- `PrestamoService` **tiene un** `Repository` → usá composición (campo en la clase)
-
-Una regla práctica: si tenés que forzar la relación o la herencia te obliga a dejar métodos vacíos o lanzar excepciones en el hijo, probablemente no sea el diseño correcto.
+Esto se llama **dynamic dispatch**: el método que se ejecuta se resuelve en tiempo de ejecución, no en compilación.
 
 ---
 
-## 5. Records
-
-Un `record` es una clase inmutable diseñada para representar datos puros. Java genera automáticamente el constructor, getters, `equals`, `hashCode` y `toString`.
-
-```java
-// Equivalente a una clase con 30+ líneas
-public record Libro(String isbn, String titulo, String autor, int anio) {}
-
-// Uso
-Libro libro = new Libro("978-...", "Clean Code", "Martin", 2008);
-System.out.println(libro.titulo()); // getter sin "get"
-```
-
-Usá `record` cuando el objeto no cambia después de crearse (un Libro no muta). Usá clase cuando el objeto tiene estado variable (un Socio acumula préstamos).
-
----
-
-## 6. Optional
-
-`Optional<T>` evita devolver `null` en búsquedas. Obliga a manejar el caso donde no hay resultado.
+### Plantillas y "perforaciones"
+Una clase abstracta actúa como una plantilla con "huecos" que las subclases deben completar. Los métodos abstractos son las perforaciones: el padre define que debe existir, pero no cómo.
 
 ```java
-// Sin Optional: peligroso
-Libro libro = repo.buscarPorIsbn("123"); // puede ser null
-libro.getTitulo(); // NullPointerException si no existe
+public abstract class Socio {
+    // Plantilla: define el flujo general
+    public boolean puedeTomarPrestado() {
+        return !bloqueado && librosPrestados.size() < getLimitePrestamos();
+    }
 
-// Con Optional: seguro
-Optional<Libro> resultado = repo.buscarPorIsbn("123");
-Libro libro = resultado.orElseThrow(() -> new LibroNoEncontradoException("123"));
-```
-
-Métodos más usados:
-
-| Método | Qué hace |
-|---|---|
-| `Optional.ofNullable(v)` | Crea un Optional que acepta null |
-| `Optional.empty()` | Crea un Optional vacío |
-| `isPresent()` | true si tiene valor |
-| `orElse(x)` | Devuelve el valor o `x` si vacío |
-| `orElseThrow(ex)` | Devuelve el valor o lanza la excepción |
-| `ifPresent(accion)` | Ejecuta solo si tiene valor |
-
----
-
-## 7. Excepciones Personalizadas
-
-Permiten manejar cada tipo de error de forma específica y hacen el código más legible.
-
-```java
-// MAL: genérico, no se sabe qué falló
-throw new Exception("Error");
-
-// BIEN: el tipo ya dice qué pasó
-throw new LibroNoDisponibleException(isbn);
-```
-
-La jerarquía del proyecto:
-```
-Exception
-└── BibliotecaException           ← base de todos los errores de negocio
-    ├── LibroNoDisponibleException
-    ├── LibroNoEncontradoException
-    ├── SocioNoEncontradoException
-    └── LimitePrestamosException
-```
-
-Tener una base común permite un catch genérico si es necesario:
-
-```java
-try {
-    servicio.realizarPrestamo(isbn, socioId);
-} catch (LibroNoDisponibleException e) {
-    System.out.println("Ese libro ya está prestado.");
-} catch (LimitePrestamosException e) {
-    System.out.println("Llegaste al límite de préstamos.");
-} catch (BibliotecaException e) {
-    System.out.println("Error: " + e.getMessage()); // cualquier otro error de negocio
+    // Perforación: el hijo completa el detalle
+    public abstract int getLimitePrestamos();
 }
 ```
 
 ---
 
-## 8. Repositorios e Inyección de Dependencias
+### Variables de referencia y Memoria
+En Java, los objetos viven en el **heap** (memoria dinámica). Las variables no contienen el objeto, contienen una **referencia** (dirección de memoria) al objeto.
 
-**Repositorio:** capa que abstrae el almacenamiento. El servicio no sabe si los datos están en memoria o en una base de datos.
+```java
+Socio s1 = new SocioEstudiante(1, "Ana", "12345", "ana@mail.com");
+Socio s2 = s1; // s2 apunta al MISMO objeto, no es una copia
+
+s2.setBloqueado(true);
+System.out.println(s1.isBloqueado()); // true, porque s1 y s2 son el mismo objeto
+```
+
+Los tipos primitivos (`int`, `boolean`, `double`) se guardan directamente en la variable, no como referencia.
+
+---
+
+### Responsabilidad y Colaboración
+Cada clase tiene una responsabilidad clara. Cuando necesita algo que no es su responsabilidad, colabora con otra clase.
+
+En BiblioTech:
+- `PrestamoService` necesita verificar si un libro existe → colabora con `LibroRepositoryImpl`
+- `PrestamoService` necesita verificar el límite del socio → colabora con `Socio`
+- `Socio` sabe si puede tomar prestado → es su responsabilidad
+
+```java
+Libro libro = libroRepo.buscarPorId(isbn).orElseThrow(...);
+Socio socio = socioRepo.buscarPorId(id).orElseThrow(...);
+if (!socio.puedeTomarPrestado()) { ... } // Socio responde por sí mismo
+```
+
+---
+
+### Servicios
+Los servicios contienen la lógica de negocio. No saben cómo se guardan los datos (eso es del repositorio) ni cómo se muestran (eso es del Main). Solo aplican las reglas.
+
+Un servicio típico: valida, busca, aplica reglas, guarda, retorna resultado o lanza excepción.
+
+---
+
+### Funcionalidades recientes
+
+**Records (Java 16+):** clases inmutables para datos puros, generan constructor, getters, equals, hashCode y toString automáticamente.
+```java
+public record Libro(String isbn, String titulo) {}
+```
+
+**Switch expressions (Java 14+):** switch como expresión con flechas, sin break.
+```java
+switch (opcion) {
+    case 1 -> menuLibros();
+    case 2 -> menuSocios();
+    default -> System.out.println("Inválido");
+}
+```
+
+**var (Java 10+):** inferencia de tipos local.
+```java
+var lista = new ArrayList<Libro>(); // el compilador infiere ArrayList<Libro>
+```
+
+---
+
+## 2. Interfaces y Colecciones
+
+### Clases Abstractas
+Una clase abstracta no se puede instanciar directamente. Puede tener métodos con implementación y métodos abstractos (sin implementación).
+
+```java
+public abstract class Socio {
+    public boolean puedeTomarPrestado() { ... } // tiene implementación
+    public abstract int getLimitePrestamos();    // sin implementación
+}
+
+// Socio s = new Socio(); // ERROR: no se puede instanciar
+Socio s = new SocioEstudiante(...); // OK: se instancia la subclase
+```
+
+#### Clase abstracta pura
+Cuando todos sus métodos son abstractos. Es casi equivalente a una interfaz, pero puede tener campos y constructor.
+
+```java
+public abstract class FiguraGeometrica {
+    public abstract double calcularArea();
+    public abstract double calcularPerimetro();
+}
+```
+
+---
+
+### Interfaces
+Define un contrato: qué métodos debe tener una clase, sin implementación. Una clase puede implementar múltiples interfaces.
 
 ```java
 public interface Repository<T, ID> {
@@ -271,178 +183,410 @@ public interface Repository<T, ID> {
 }
 ```
 
-**Inyección de dependencias:** el servicio recibe sus repositorios por constructor, no los crea él mismo.
+| | Interfaz | Clase Abstracta |
+|---|---|---|
+| Instanciable | No | No |
+| Herencia múltiple | Sí | No |
+| Campos | Solo constantes | Sí |
+| Constructor | No | Sí |
+| Métodos con impl. | Solo `default` | Sí |
+
+**Uso en OO:** las interfaces permiten que clases muy distintas compartan un contrato. `LibroRepositoryImpl` y `SocioRepositoryImpl` son muy distintas pero ambas implementan `Repository`.
+
+---
+
+### Colecciones
+
+#### Lista (`List`)
+Ordenada, permite duplicados. Cada elemento tiene un índice.
 
 ```java
-// MAL: acoplado a la implementación concreta
-public class PrestamoService {
-    private LibroRepositoryImpl repo = new LibroRepositoryImpl();
+List<String> libros = new ArrayList<>();
+libros.add("Clean Code");
+libros.add("Clean Code"); // permite duplicados
+libros.get(0);            // acceso por índice
+```
+
+#### Set
+No permite duplicados, no garantiza orden.
+
+```java
+Set<String> categorias = new HashSet<>();
+categorias.add("Ficción");
+categorias.add("Ficción"); // ignorado, ya existe
+```
+
+#### Mapa (`Map`)
+Pares clave-valor. La clave es única. Acceso directo por clave en O(1).
+
+```java
+Map<String, Libro> storage = new HashMap<>();
+storage.put("978-123", libro);       // guardar
+storage.get("978-123");              // buscar por clave
+storage.containsKey("978-123");      // verificar existencia
+```
+
+En BiblioTech usamos `HashMap` en los repositorios porque el acceso por ISBN o ID es instantáneo.
+
+---
+
+### Iterar colecciones
+
+```java
+List<Libro> libros = libroRepo.buscarTodos();
+
+// For-each clásico
+for (Libro libro : libros) {
+    System.out.println(libro.titulo());
 }
 
-// BIEN: depende de la interfaz, recibe lo que le pasen
-public class PrestamoService {
-    private final Repository<Libro, String> libroRepo;
+// forEach con lambda
+libros.forEach(libro -> System.out.println(libro.titulo()));
 
-    public PrestamoService(Repository<Libro, String> libroRepo) {
-        this.libroRepo = libroRepo;
+// forEach con method reference
+libros.forEach(System.out::println);
+
+// Iterar un Map
+storage.forEach((isbn, libro) -> System.out.println(isbn + ": " + libro.titulo()));
+```
+
+---
+
+### Colecciones de fábrica (Java 9+)
+Crean colecciones inmutables de forma concisa.
+
+```java
+List<String> lista = List.of("uno", "dos", "tres"); // inmutable
+Set<String> set = Set.of("a", "b", "c");            // inmutable
+Map<String, Integer> mapa = Map.of("clave", 1);     // inmutable
+```
+
+No se pueden modificar: `lista.add("cuatro")` lanza `UnsupportedOperationException`.
+
+---
+
+### Inferencia de tipos - var
+El compilador infiere el tipo según lo que se asigna. Solo funciona en variables locales.
+
+```java
+var lista = new ArrayList<Libro>();      // infiere ArrayList<Libro>
+var mapa = new HashMap<String, Socio>(); // infiere HashMap<String, Socio>
+```
+
+No significa que Java sea dinámico: el tipo se fija en compilación, solo que no hay que escribirlo.
+
+---
+
+### Jerarquía de herencia en colecciones
+
+```
+Iterable
+└── Collection
+    ├── List
+    │   ├── ArrayList
+    │   └── LinkedList
+    ├── Set
+    │   ├── HashSet
+    │   └── TreeSet (ordenado)
+    └── Queue
+Map (no hereda de Collection)
+    ├── HashMap
+    └── TreeMap (ordenado)
+```
+
+---
+
+## 3. Genéricos y Excepciones
+
+### Genéricos
+Permiten escribir código que funciona con cualquier tipo, manteniendo la seguridad del compilador.
+
+#### Clases genéricas
+```java
+public class Caja<T> {
+    private T contenido;
+    public void guardar(T contenido) { this.contenido = contenido; }
+    public T obtener() { return contenido; }
+}
+
+Caja<Libro> cajaLibro = new Caja<>();
+cajaLibro.guardar(new Libro(...));
+Libro libro = cajaLibro.obtener(); // no necesita cast
+```
+
+#### Interfaces genéricas
+En BiblioTech, `Repository<T, ID>` es una interfaz genérica. Sin genéricos habría que escribir una interfaz distinta para cada tipo, o usar `Object` con casts peligrosos.
+
+```java
+// T = Libro, ID = String
+public class LibroRepositoryImpl implements Repository<Libro, String> { ... }
+
+// T = Socio, ID = Integer
+public class SocioRepositoryImpl implements Repository<Socio, Integer> { ... }
+```
+
+---
+
+### Excepciones
+
+#### Jerarquía de herencia
+```
+Throwable
+├── Error (no manejar: OutOfMemoryError, StackOverflowError)
+└── Exception
+    ├── RuntimeException (unchecked)
+    │   ├── NullPointerException
+    │   ├── IllegalArgumentException
+    │   └── BibliotecaException ← nuestra base
+    └── IOException (checked)
+```
+
+#### Tipos de excepciones
+**Checked:** heredan de `Exception`. El compilador obliga a manejarlas. Representan errores recuperables esperados.
+
+**Unchecked:** heredan de `RuntimeException`. No obligan a manejarlas. En BiblioTech usamos esta base para que `orElseThrow` funcione correctamente con lambdas.
+
+#### Bloques try-catch, finally, resource
+
+```java
+// try-catch
+try {
+    prestamoService.realizarPrestamo(isbn, socioId);
+} catch (LibroNoDisponibleException e) {
+    System.out.println("El libro no está disponible: " + e.getMessage());
+} catch (LimitePrestamosException e) {
+    System.out.println("Límite alcanzado: " + e.getMessage());
+}
+
+// finally: se ejecuta siempre
+try {
+    // código
+} catch (Exception e) {
+    // manejo
+} finally {
+    scanner.close(); // siempre se ejecuta
+}
+
+// try-with-resources: cierra el recurso automáticamente
+try (Scanner sc = new Scanner(System.in)) {
+    String linea = sc.nextLine();
+} // sc.close() se llama automáticamente
+```
+
+#### Multi-catch
+```java
+try {
+    // código
+} catch (LibroNoEncontradoException | SocioNoEncontradoException e) {
+    System.out.println("Recurso no encontrado: " + e.getMessage());
+}
+```
+
+#### Excepciones propias
+```java
+public class BibliotecaException extends RuntimeException {
+    public BibliotecaException(String mensaje) { super(mensaje); }
+}
+
+public class LibroNoDisponibleException extends BibliotecaException {
+    public LibroNoDisponibleException(String isbn) {
+        super("El libro con ISBN " + isbn + " no está disponible.");
     }
 }
 ```
 
 ---
 
-## 9. Comandos de Git
+## 4. Streams
 
-Git es un sistema de control de versiones. Registra cada cambio que hacés en el código y te permite volver atrás, trabajar en paralelo y colaborar con otros.
+Los Streams permiten procesar colecciones de forma declarativa. En lugar de decir *cómo* hacerlo (bucle), decís *qué* querés hacer.
 
-### Configuración inicial
+```java
+// Sin streams: imperativo
+List<Libro> resultado = new ArrayList<>();
+for (Libro l : libros) {
+    if (l.categoria().equals("Ficción")) resultado.add(l);
+}
 
-```bash
-git config --global user.name "Tu Nombre"
-git config --global user.email "tu@email.com"
+// Con streams: declarativo
+List<Libro> resultado = libros.stream()
+    .filter(l -> l.categoria().equals("Ficción"))
+    .toList();
 ```
 
-### Comandos básicos
+### forEach
+Ejecuta una acción por cada elemento. Operación terminal (consume el stream).
 
-| Comando | Qué hace |
-|---|---|
-| `git init` | Inicializa un repositorio en la carpeta actual |
-| `git clone <url>` | Copia un repositorio remoto a tu máquina |
-| `git status` | Muestra qué archivos cambiaron o están pendientes |
-| `git add <archivo>` | Agrega un archivo al área de staging |
-| `git add .` | Agrega todos los archivos modificados |
-| `git commit -m "mensaje"` | Guarda los cambios con un mensaje descriptivo |
-| `git log --oneline` | Muestra el historial de commits resumido |
-| `git diff` | Muestra exactamente qué líneas cambiaron |
-
-### Trabajar con ramas
-
-| Comando | Qué hace |
-|---|---|
-| `git branch` | Lista todas las ramas locales |
-| `git checkout -b nombre` | Crea una rama nueva y cambia a ella |
-| `git checkout nombre` | Cambia a una rama existente |
-| `git merge nombre` | Fusiona una rama en la rama actual |
-
-### Trabajar con GitHub (remoto)
-
-| Comando | Qué hace |
-|---|---|
-| `git remote add origin <url>` | Conecta el repo local con GitHub |
-| `git push origin nombre-rama` | Sube una rama a GitHub |
-| `git pull origin main` | Trae los cambios de GitHub a tu rama local |
-| `git fetch` | Descarga cambios remotos sin aplicarlos |
-
-### El área de staging
-
-Git tiene tres zonas:
-
-```
-Directorio de trabajo  →  git add  →  Staging  →  git commit  →  Historial
-(archivos modificados)                (listos)                    (guardados)
+```java
+libros.forEach(System.out::println);
 ```
 
-`git add` no guarda nada todavía, solo marca qué querés incluir en el próximo commit. Esto te permite commitear solo algunos archivos aunque hayas modificado varios.
+### map y collect
+`map` transforma cada elemento. `collect` acumula los resultados.
 
-### Errores comunes y cómo resolverlos
+```java
+List<String> titulos = libros.stream()
+    .map(Libro::titulo)
+    .collect(Collectors.toList());
 
-```bash
-# "cambios locales serán sobrescritos por checkout"
-# → Tenés archivos modificados sin commitear. Commiteá primero:
-git add .
-git commit -m "feat: work in progress"
-git checkout otra-rama
+// Forma corta (Java 16+)
+List<String> titulos = libros.stream()
+    .map(Libro::titulo)
+    .toList();
+```
 
-# Ver qué archivos tienen cambios pendientes
-git status
+### peek
+Ejecuta una acción sin modificar el elemento. Útil para depurar.
 
-# Descartar cambios en un archivo (cuidado: no se puede deshacer)
-git restore archivo.java
+```java
+libros.stream()
+    .peek(l -> System.out.println("Procesando: " + l.titulo()))
+    .filter(Libro::disponible)
+    .toList();
+```
+
+### filter
+Filtra elementos según una condición.
+
+```java
+// En BiblioTech, búsqueda por autor:
+storage.values().stream()
+    .filter(l -> l.autor().toLowerCase().contains(autor.toLowerCase()))
+    .toList();
+```
+
+### findFirst
+Devuelve el primer elemento que cumple la condición, envuelto en `Optional`.
+
+```java
+Optional<Socio> socio = storage.values().stream()
+    .filter(s -> s.getDni().equals(dni))
+    .findFirst();
+```
+
+### Operaciones varias
+
+```java
+// Contar
+long disponibles = libros.stream().filter(Libro::disponible).count();
+
+// Verificar condición
+boolean hayFiccion = libros.stream()
+    .anyMatch(l -> l.categoria().equals("Ficción"));
+
+// Ordenar
+List<Libro> ordenados = libros.stream()
+    .sorted(Comparator.comparing(Libro::titulo))
+    .toList();
+```
+
+### Reducción
+Combina todos los elementos en un único resultado.
+
+```java
+int sumaAnios = libros.stream()
+    .mapToInt(Libro::anio)
+    .sum();
+
+Optional<Integer> producto = List.of(1, 2, 3, 4).stream()
+    .reduce((a, b) -> a * b); // 24
+```
+
+### Agrupadas
+Agrupa elementos por un criterio en un `Map`.
+
+```java
+Map<String, List<Libro>> porCategoria = libros.stream()
+    .collect(Collectors.groupingBy(Libro::categoria));
+
+porCategoria.get("Ficción"); // todos los libros de Ficción
+```
+
+### flatMap
+Aplana streams de streams en un único stream.
+
+```java
+List<List<String>> listas = List.of(List.of("a", "b"), List.of("c", "d"));
+
+List<String> plana = listas.stream()
+    .flatMap(Collection::stream)
+    .toList(); // ["a", "b", "c", "d"]
 ```
 
 ---
 
-## 10. Flujo de GitHub
+## 5. Streams de java.io
 
-Cada funcionalidad sigue este ciclo:
+Los streams de `java.io` son para leer y escribir datos en archivos o redes, distintos a los Streams de colecciones.
 
-```
-1. Abrir Issue  →  describir la tarea antes de tocar código
-2. Crear rama   →  git checkout -b feature/nombre (siempre desde main)
-3. Escribir código y commitear archivo por archivo
-4. Push         →  git push origin feature/nombre
-5. Abrir PR     →  "Closes #N" vincula al Issue automáticamente
-6. Revisar diff →  pestaña "Files changed"
-7. Mergear      →  el Issue se cierra automáticamente
-8. Volver a main→  git checkout main && git pull origin main
-```
+### Stream de bytes
+Trabajan con datos binarios (imágenes, archivos comprimidos).
 
-### Por qué siempre crear ramas desde main
-
-Si creás una rama desde otra rama que no es main, arrastrás todos sus commits. Eso ensucia el historial del PR y mezcla cambios de distintas funcionalidades.
-
-```bash
-# SIEMPRE antes de crear una rama nueva:
-git checkout main
-git pull origin main       # asegurarse de tener main actualizado
-git checkout -b feature/nueva-funcionalidad
+```java
+try (FileInputStream fis = new FileInputStream("archivo.bin")) {
+    int b;
+    while ((b = fis.read()) != -1) {
+        System.out.print(b);
+    }
+}
 ```
 
----
+### Stream de caracteres
+Trabajan con texto, manejan la codificación automáticamente.
 
-## 11. Conventional Commits
-
-Formato estándar para mensajes de commit:
-
-```
-tipo: descripción breve en minúsculas
-```
-
-### Por qué usar este formato
-
-- El historial del proyecto se lee como una lista de cambios
-- Es fácil entender qué hizo cada commit sin abrir el código
-- Herramientas como el CHANGELOG se pueden generar automáticamente
-- Es el estándar en la industria
-
-### Tipos
-
-| Tipo | Cuándo |
-|---|---|
-| `feat` | Nueva funcionalidad |
-| `fix` | Corrección de bug |
-| `refactor` | Cambio sin agregar ni corregir |
-| `docs` | Solo documentación |
-| `chore` | Configuración, dependencias |
-| `test` | Agregar o modificar tests |
-
-### Por qué `feat` en los títulos de Issues y PRs
-
-Los Issues y PRs describen una funcionalidad completa, igual que un commit. Usar `feat:` en el título hace que sea consistente con los commits que contiene y que el profe pueda leer el historial de un vistazo y entender qué se hizo en cada PR.
-
-```
-PR #1  feat: modelos base del sistema
-PR #2  feat: modelos de socios
-PR #3  feat: jerarquía de excepciones
-PR #4  feat: repositorios en memoria
-PR #5  feat: servicios de negocio
-PR #6  feat: interfaz de línea de comandos
+```java
+try (BufferedReader br = new BufferedReader(new FileReader("archivo.txt"))) {
+    String linea;
+    while ((linea = br.readLine()) != null) {
+        System.out.println(linea);
+    }
+}
 ```
 
-### Ejemplos del proyecto
+### Familia de clases
 
-```bash
-feat: add Recurso interface
-feat: add Libro record
-feat: add abstract Socio class with loan logic
-feat: add SocioEstudiante with loan limit 3
-feat: add BibliotecaException base class
-fix: correct loan limit validation
-docs: update CHANGELOG with sprint 3
-chore: add .gitignore
+| Tipo | Entrada | Salida |
+|---|---|---|
+| Bytes | `InputStream`, `FileInputStream` | `OutputStream`, `FileOutputStream` |
+| Caracteres | `Reader`, `FileReader`, `BufferedReader` | `Writer`, `FileWriter`, `BufferedWriter` |
+
+Siempre usar `Buffered` para mejor rendimiento: lee bloques en lugar de byte por byte.
+
+### NIO y Path (Java 7+)
+API moderna para manejo de archivos, más simple y robusta.
+
+```java
+Path ruta = Path.of("datos/libros.txt");
 ```
 
-Un buen mensaje responde a: "si aplico este commit, el proyecto va a..."
-- "...agregar la interfaz Recurso" ✅
-- "...cambios" ❌
-- "...arreglé cosas" ❌
+### Files
+Clase de utilidades para operaciones comunes con archivos.
+
+```java
+// Leer todas las líneas
+List<String> lineas = Files.readAllLines(Path.of("libros.txt"));
+
+// Escribir texto
+Files.writeString(Path.of("salida.txt"), "contenido");
+
+// Verificar existencia
+Files.exists(Path.of("libros.txt"));
+
+// Crear directorio
+Files.createDirectories(Path.of("datos/backup"));
+```
+
+### Texto y binario con NIO
+
+```java
+// Leer archivo de texto completo
+String contenido = Files.readString(Path.of("libros.txt"));
+
+// Leer archivo binario
+byte[] bytes = Files.readAllBytes(Path.of("imagen.png"));
+
+// Escribir archivo binario
+Files.write(Path.of("copia.png"), bytes);
+```
+
+Para el bonus de persistencia del TP se podría usar `Files.writeString` para guardar datos en CSV y `Files.readAllLines` para cargarlos al iniciar el sistema.
